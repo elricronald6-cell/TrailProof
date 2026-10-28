@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TrailProof — proof-of-visit trails on BOT Chain</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Mulish:wght@400;600&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.9.0/ethers.umd.min.js"></script>
+<style>
+/* ============================================================================
+   ORGANIC / WABI-SABI — warm paper, grain, imperfect lines, muted pigment.
+   One narrow column, read top to bottom. No cards, no panels, no stat strip:
+   whitespace and hairline rules do all the separating.
+   ========================================================================== */
+:root{
+  --paper:#f6f2e8;
+  --paper-2:#efe9db;
+  --ink:#31302b;
+  --ink-soft:#6f6a5e;
+  --olive:#6c7350;
+  --terracotta:#b05f3c;
+  --clay:#caa98a;
+  --hair:rgba(49,48,43,.22);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--paper);color:var(--ink);
+  font-family:'Mulish',system-ui,sans-serif;font-size:17px;line-height:1.78;
+  -webkit-font-smoothing:antialiased;
+}
+/* paper grain */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E");
+}
+.column{position:relative;z-index:1;max-width:720px;margin:0 auto;padding:0 26px 120px}
+h1,h2,h3,h4,.serif{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;margin:0}
+em{font-family:'Cormorant Garamond',serif;font-style:italic}
+
+/* ---------- a quiet opening, no nav bar ---------- */
+.opening{padding:84px 0 0}
+.mark{width:58px;height:58px;margin-bottom:26px;opacity:.9}
+h1{font-size:clamp(42px,8vw,66px);line-height:1.06;letter-spacing:-.01em}
+h1 .second{color:var(--terracotta)}
+.standfirst{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:23px;
+  line-height:1.6;color:var(--ink-soft);margin-top:18px;max-width:34ch}
+.state{margin-top:30px;font-size:15px;color:var(--ink-soft)}
+.state b{color:var(--ink);font-weight:600}
+
+/* a text link that happens to be a button */
+.textbtn{background:none;border:none;padding:0;cursor:pointer;font-family:'Mulish';font-weight:600;
+  font-size:15px;color:var(--terracotta);border-bottom:1.5px solid var(--terracotta);
+  line-height:1.2;transition:.14s}
+.textbtn:hover:not(:disabled){color:var(--ink);border-color:var(--ink)}
+.textbtn:disabled{opacity:.45;cursor:not-allowed}
+.textbtn.quiet{color:var(--ink-soft);border-color:var(--hair)}
+.linkrow{display:flex;gap:22px;flex-wrap:wrap;align-items:baseline;margin-top:18px}
+
+hr{border:none;height:1px;background:var(--hair);margin:56px 0}
+hr.short{width:76px;margin:46px 0;height:2px;background:var(--clay);border-radius:2px}
+
+/* ---------- a trail, written out rather than boxed ---------- */
+.trail{padding:4px 0 10px}
+.trail + .trail{border-top:1px solid var(--hair);margin-top:48px;padding-top:46px}
+.trail h2{font-size:33px;line-height:1.14}
+.trail .byline{font-size:14px;color:var(--ink-soft);margin-top:6px}
+.trail .sentence{margin-top:16px;max-width:54ch}
+.trail .sentence b{font-weight:600}
+
+/* the path: a hand-drawn line with stations, drawn inline */
+.path{margin:26px 0 6px}
+.path svg{display:block;width:100%;height:98px;overflow:visible}
+.stations{list-style:none;padding:0;margin:14px 0 0;display:flex;flex-wrap:wrap;gap:6px 22px}
+.stations li{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:19px;color:var(--ink-soft)}
+.stations li.done{font-style:normal;color:var(--olive)}
+.stations li.next{font-style:normal;color:var(--terracotta)}
+.stations li.done::before{content:"✓ ";font-size:14px}
+
+.codeline{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:24px}
+input,select{padding:11px 2px;border:none;border-bottom:1.5px solid var(--hair);background:transparent;
+  color:var(--ink);font-family:'Mulish';font-size:16px;min-width:200px}
+input:focus,select:focus{outline:none;border-bottom-color:var(--terracotta)}
+input::placeholder{color:#9a9488}
+label{display:block;font-family:'Mulish';font-weight:600;font-size:12px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-soft);margin-top:24px}
+
+/* ---------- laying a trail, at the foot of the page ---------- */
+.lay h2{font-size:33px}
+.lay p{color:var(--ink-soft);max-width:54ch}
+.waypoints{margin-top:10px}
+.wprow{display:flex;gap:18px;align-items:baseline;flex-wrap:wrap;padding:10px 0;
+  border-bottom:1px dotted var(--hair)}
+.wprow .n{font-family:'Cormorant Garamond',serif;font-size:26px;color:var(--clay);width:26px;flex:0 0 auto}
+.twocol{display:flex;gap:26px;flex-wrap:wrap;margin-top:6px}
+.twocol > div{flex:1 1 180px}
+.caution{margin-top:28px;padding-left:18px;border-left:2px solid var(--terracotta);
+  font-size:15.5px;color:var(--ink-soft);max-width:52ch}
+
+.quiet{color:var(--ink-soft);font-style:italic;font-family:'Cormorant Garamond',serif;font-size:20px}
+
+#toast{position:fixed;left:26px;bottom:26px;transform:translateY(180%);
+  background:var(--ink);color:var(--paper);padding:12px 20px;border-radius:2px;
+  font-family:'Mulish';font-size:14px;max-width:min(88vw,420px);transition:transform .28s;z-index:60}
+#toast.show{transform:translateY(0)}
+#toast.bad{background:var(--terracotta)}
+
+footer{margin-top:84px;padding-top:22px;border-top:1px solid var(--hair);
+  font-size:13.5px;color:var(--ink-soft);display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}
+
+/* ===== BOT Chain ecosystem footer (KPI 5) ===== */
+footer.bc-foot{display:block;position:relative;z-index:1;max-width:720px;margin:56px auto 0;
+  padding:0 26px 44px}
+.bc-foot-grid{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:20px;
+  padding:22px 0 18px;border-top:1px solid rgba(49,48,43,.22)}
+@media(max-width:720px){.bc-foot-grid{grid-template-columns:1fr;gap:14px}}
+.bc-foot .bc-logo{opacity:.92}
+.bc-foot .bc-id{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:23px;color:#31302b}
+.bc-foot .bc-id small{display:block;font-family:'Mulish',sans-serif;font-weight:600;font-size:10px;
+  letter-spacing:.2em;text-transform:uppercase;color:#6f6a5e;margin-top:2px}
+.bc-foot .bc-links{display:flex;gap:22px;flex-wrap:wrap}
+.bc-foot .bc-links a{font-family:'Mulish',sans-serif;font-weight:600;font-size:14px;
+  color:#b05f3c;text-decoration:none;border-bottom:1.5px solid #b05f3c;padding-bottom:1px}
+.bc-foot .bc-links a:hover{color:#31302b;border-color:#31302b}
+.bc-foot .bc-meta{font-family:'Mulish',sans-serif;font-size:12px;color:#6f6a5e;
+  padding:14px 0 0;border-top:1px dotted rgba(49,48,43,.22);
+  display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.bc-foot .bc-meta b{color:#31302b;font-weight:600}
+</style>
+</head>
+<body>
+<div class="column">
+
+  <header class="opening">
+    <svg class="mark" viewBox="0 0 60 60" aria-hidden="true">
+      <path d="M6 48 C18 44 22 30 30 28 C38 26 44 16 54 12" fill="none" stroke="#b05f3c"
+        stroke-width="2.6" stroke-linecap="round" stroke-dasharray="7 5"/>
+      <circle cx="30" cy="28" r="4.4" fill="none" stroke="#6c7350" stroke-width="2.4"/>
+      <circle cx="54" cy="12" r="3.4" fill="#b05f3c"/>
+    </svg>
+    <h1>Trail<span class="second">Proof</span></h1>
+    <p class="standfirst">Waypoints sealed behind a code posted at the place itself. Walk them in order; finish before the trail closes and the purse is split between everyone who did.</p>
+    <div class="state" id="state">Reading the chain…</div>
+    <div class="linkrow">
+      <button class="textbtn" id="btn-connect">Connect a wallet</button>
+      <button class="textbtn quiet" id="btn-refresh">Reload</button>
+    </div>
+  </header>
+
+  <hr />
+
+  <main id="trails">
+    <p class="quiet">No trails laid yet.</p>
+  </main>
+
+  <hr />
+
+  <section class="lay">
+    <h2>Lay a trail</h2>
+    <p>Name each waypoint and give it a code. The code is hashed here in your browser — only the hash is sent, and it is bound to this trail's number so it cannot be reused on another.</p>
+
+    <label for="f-name">Trail name</label>
+    <input id="f-name" maxlength="56" placeholder="Ridgeline Loop" style="width:100%" />
+
+    <label>Waypoints, in walking order</label>
+    <div class="waypoints" id="wps"></div>
+    <div style="margin-top:14px"><button class="textbtn quiet" id="btn-add-wp">Add another waypoint</button></div>
+
+    <div class="twocol">
+      <div>
+        <label for="f-purse">Purse in BOT</label>
+        <input id="f-purse" type="number" min="0.01" step="0.01" value="1" style="width:100%" />
+      </div>
+      <div>
+        <label for="f-dur">Open for</label>
+        <select id="f-dur" style="width:100%">
+          <option value="604800">7 days</option>
+          <option value="2592000" selected>30 days</option>
+          <option value="7776000">90 days</option>
+          <option value="15552000">180 days</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-top:30px"><button class="textbtn" id="btn-create">Publish the trail</button></div>
+
+    <p class="caution">Print the codes only after the trail is published. The hashes are bound to the trail's number, which is only certain once the transaction lands — this page checks them for you and says plainly if anything is off.</p>
+    <p class="caution" style="border-color:var(--clay)">A code becomes public the moment the first walker submits it, because calldata is readable. That proves somebody knew the code, not that everyone stood at the post. Keep windows short.</p>
+  </section>
+
+  <footer>
+    <span id="f-left">TrailProof</span>
+    <span id="f-chain">BOT Chain</span>
+  </footer>
+</div>
+
+
+<!-- ===== BOT Chain ecosystem footer (KPI 5) ===== -->
+<footer class="bc-foot">
+  <div class="bc-foot-grid">
+    <div class="bc-logo" aria-hidden="true"><svg viewBox="0 0 63.63 100" xmlns="http://www.w3.org/2000/svg" style="width:22px;height:35px;display:block"><path fill="#00A67E" d="M31.67 99.95 L0 82.48 L0.11 63.74 L47.01 90.60 L47.01 73.19 L15.98 55.32 L15.95 36.49 L46.92 53.57 L47.39 36.82 L15.96 17.81 L16.26 0 L63.06 27.02 L62.82 46.20 L47.86 54.67 L62.85 63.00 L63.62 81.42 Z"/></svg></div>
+    <div class="bc-id">BOT Chain<small>Part of the ecosystem</small></div>
+    <div class="bc-links">
+      <a href="https://botchain.ai" target="_blank" rel="noopener noreferrer">botchain.ai</a>
+      <a id="bc-explorer" href="https://scan.botchain.ai" target="_blank" rel="noopener noreferrer">Explorer</a>
+    </div>
+  </div>
+  <div class="bc-meta">
+    <span>&copy; 2026 <b>BOT Chain</b> &mdash; EVM-compatible Layer 1</span>
+  </div>
+</footer>
+
+<div id="toast"></div>
+
+<script>
+/* ============================================================================
+   CONTRACT + NETWORK CONFIG
+
+   Paste the deployed address below. Defaults to BOT Chain TESTNET.
+
+   TESTNET -> MAINNET: swap these five values together, never some of them.
+     CONTRACT_ADDRESS  -> the mainnet address
+     chainId           -> "0x2A5"
+     chainName         -> "BOT Chain"
+     rpcUrls           -> ["https://rpc.botchain.ai"]
+     blockExplorerUrls -> ["https://scan.botchain.ai"]
+   ...and set label -> "MAINNET" so the badge reads correctly.
+   ========================================================================== */
+const CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+const NETWORK = {
+  chainId: "0x3C8",                              // 968 testnet  | mainnet: "0x2A5"
+  chainIdDec: 968,                               // reference only, not shown on the page | mainnet: 677
+  chainName: "BOT Chain Testnet",                //              | mainnet: "BOT Chain"
+  rpcUrls: ["https://rpc.bohr.life"],            //              | mainnet: ["https://rpc.botchain.ai"]
+  blockExplorerUrls: ["https://scan.bohr.life"], //              | mainnet: ["https://scan.botchain.ai"]
+  nativeCurrency: { name: "BOT", symbol: "BOT", decimals: 18 },
+  label: "TESTNET"                               //              | mainnet: "MAINNET"
+};
+
+const ABI = [
+  "function createTrail(string name, string[] waypointNames, bytes32[] gates, uint64 durationSecs) payable returns (uint256)",
+  "function topUpPurse(uint256 trailId) payable",
+  "function checkIn(uint256 trailId, string code)",
+  "function claimPurse(uint256 trailId)",
+  "function reclaimPurse(uint256 trailId)",
+  "function trailCount() view returns (uint256)",
+  "function getTrail(uint256 id) view returns (tuple(address creator,uint256 purse,uint64 closesAt,uint32 waypointCount,uint32 finishers,uint256 shareEach,bool shareFixed,bool reclaimed,string name))",
+  "function getWaypointNames(uint256 id) view returns (string[])",
+  "function progressOf(uint256 id, address walker) view returns (uint32)",
+  "function hasFinished(uint256 id, address walker) view returns (bool)",
+  "function hasClaimed(uint256 id, address walker) view returns (bool)",
+  "function projectedShare(uint256 id) view returns (uint256)",
+  "function getRecent(uint256 limit) view returns (uint256[])",
+  "function gateAt(uint256 id, uint32 index) view returns (bytes32)",
+  "function lockedTotal() view returns (uint256)",
+  "function feeBps() view returns (uint16)"
+];
+
+const ZERO = "0x0000000000000000000000000000000000000000";
+const $ = (id) => document.getElementById(id);
+let provider, signer, account, contract, readContract;
+let trails = [];
+
+function toast(msg, bad) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = "show" + (bad ? " bad" : "");
+  clearTimeout(t._h);
+  t._h = setTimeout(() => (t.className = ""), 5400);
+}
+const short = (a) => a.slice(0, 6) + "…" + a.slice(-4);
+const fmt = (wei) => {
+  const n = Number(ethers.formatEther(wei));
+  return (n >= 1 ? n.toFixed(2) : n.toFixed(4)).replace(/0+$/, "").replace(/\.$/, "");
+};
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+function reason(e) {
+  const m = (e && (e.shortMessage || e.reason || e.message)) || "Transaction failed";
+  return String(m).replace(/^execution reverted:?\s*/i, "").slice(0, 160);
+}
+function openFor(closesAt) {
+  const s = closesAt - Math.floor(Date.now() / 1000);
+  if (s <= 0) return "closed";
+  const d = Math.floor(s / 86400);
+  if (d >= 1) return d + " days left";
+  return Math.max(1, Math.floor(s / 3600)) + " hours left";
+}
+
+/* ----------------------------------------------------- waypoint entry rows */
+function addWaypointRow(name = "", code = "") {
+  const n = $("wps").children.length + 1;
+  const row = document.createElement("div");
+  row.className = "wprow";
+  row.innerHTML =
+    '<span class="n">' + n + '</span>' +
+    '<input class="wp-name" maxlength="56" value="' + esc(name) + '" placeholder="name of the place" style="flex:1 1 180px" />' +
+    '<input class="wp-code" value="' + esc(code) + '" placeholder="code posted there" style="flex:1 1 150px" />' +
+    '<button class="textbtn quiet" type="button" data-drop>remove</button>';
+  row.querySelector("[data-drop]").onclick = () => { row.remove(); renumber(); };
+  $("wps").appendChild(row);
+}
+function renumber() {
+  [...$("wps").children].forEach((r, i) => (r.querySelector(".n").textContent = i + 1));
+}
+addWaypointRow("Elm Gate", "");
+addWaypointRow("Summit Cairn", "");
+$("btn-add-wp").onclick = () => {
+  if ($("wps").children.length >= 12) { toast("Twelve waypoints is the limit.", true); return; }
+  addWaypointRow();
+};
+
+/* ---------------------------------------------------------------- wallet */
+function readOnly() {
+  try {
+    const p = new ethers.JsonRpcProvider(NETWORK.rpcUrls[0]);
+    readContract = new ethers.Contract(CONTRACT_ADDRESS, ABI, p);
+  } catch (e) { /* no read-only view */ }
+}
+async function connect() {
+  if (!window.ethereum) { toast("No wallet found. Install MetaMask.", true); return; }
+  try {
+    provider = new ethers.BrowserProvider(window.ethereum);
+    await provider.send("eth_requestAccounts", []);
+    await ensureChain();
+    signer = await provider.getSigner();
+    account = await signer.getAddress();
+    contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+    $("btn-connect").textContent = "Connected as " + short(account);
+    await load();
+  } catch (e) { toast(reason(e), true); }
+}
+async function ensureChain() {
+  const current = await window.ethereum.request({ method: "eth_chainId" });
+  if (current.toLowerCase() === NETWORK.chainId.toLowerCase()) return;
+  try {
+    await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: NETWORK.chainId }] });
+  } catch (err) {
+    if (err.code === 4902) {
+      await window.ethereum.request({
+        method: "wallet_addEthereumChain",
+        params: [{
+          chainId: NETWORK.chainId, chainName: NETWORK.chainName, rpcUrls: NETWORK.rpcUrls,
+          blockExplorerUrls: NETWORK.blockExplorerUrls, nativeCurrency: NETWORK.nativeCurrency
+        }]
+      });
+    } else throw err;
+  }
+}
+
+/* ------------------------------------------------------------------ load */
+async function load() {
+  const c = contract || readContract;
+  if (!c || CONTRACT_ADDRESS === ZERO) { render(); return; }
+  try {
+    const [n, locked, fee] = await Promise.all([c.trailCount(), c.lockedTotal(), c.feeBps()]);
+    $("state").innerHTML = "<b>" + n + "</b> trails laid · <b>" + fmt(locked) +
+      " BOT</b> waiting in purses · <b>" + (Number(fee) / 100) + "%</b> taken from a finisher's share";
+
+    const ids = await c.getRecent(12n);
+    trails = [];
+    for (const id of ids) {
+      const t = await c.getTrail(id);
+      const names = await c.getWaypointNames(id);
+      const share = await c.projectedShare(id);
+      let progress = 0, claimed = false;
+      if (account) {
+        progress = Number(await c.progressOf(id, account));
+        claimed = await c.hasClaimed(id, account);
+      }
+      trails.push({ id, t, names, share, progress, claimed });
+    }
+    render();
+  } catch (e) {
+    $("state").textContent = "Could not read the contract — check the address and network.";
+  }
+}
+
+/* ---------------------------------------------------------------- render */
+/** A deliberately wobbly path with a station per waypoint. */
+function pathSvg(total, done) {
+  const w = 660, h = 98, pad = 16;
+  const step = total > 1 ? (w - pad * 2) / (total - 1) : 0;
+  const pts = [];
+  for (let i = 0; i < total; i++) {
+    const x = pad + step * i;
+    const wobble = Math.sin(i * 1.7) * 9;
+    const y = h - 20 - ((h - 46) * i) / Math.max(1, total - 1) + wobble;
+    pts.push([x, y]);
+  }
+  if (total === 1) pts[0] = [w / 2, h / 2];
+  let d = "M" + pts[0][0].toFixed(1) + "," + pts[0][1].toFixed(1);
+  for (let i = 1; i < pts.length; i++) {
+    const [px, py] = pts[i - 1], [x, y] = pts[i];
+    const cx = (px + x) / 2, cy = (py + y) / 2 - 14;
+    d += " Q" + cx.toFixed(1) + "," + cy.toFixed(1) + " " + x.toFixed(1) + "," + y.toFixed(1);
+  }
+  let marks = "";
+  pts.forEach(([x, y], i) => {
+    const on = i < done, next = i === done;
+    marks += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (next ? 7.5 : 6) + '" fill="' +
+      (on ? "#6c7350" : "#f6f2e8") + '" stroke="' + (next ? "#b05f3c" : "#6c7350") + '" stroke-width="' +
+      (next ? 3 : 2) + '"/>';
+  });
+  return '<svg viewBox="0 0 ' + w + " " + h + '" preserveAspectRatio="none">' +
+    '<path d="' + d + '" fill="none" stroke="#caa98a" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="9 7"/>' +
+    marks + "</svg>";
+}
+
+function render() {
+  const el = $("trails");
+  if (CONTRACT_ADDRESS === ZERO) {
+    el.innerHTML = '<p class="quiet">No contract address set yet. Deploy TrailProof, then paste the address into CONTRACT_ADDRESS in this file.</p>';
+    return;
+  }
+  if (!trails.length) { el.innerHTML = '<p class="quiet">No trails laid yet.</p>'; return; }
+  const now = Math.floor(Date.now() / 1000);
+
+  el.innerHTML = trails.map(({ id, t, names, share, progress, claimed }) => {
+    const total = Number(t.waypointCount);
+    const closed = now >= Number(t.closesAt);
+    const finished = progress === total;
+    const mine = account && t.creator.toLowerCase() === account.toLowerCase();
+
+    const stations = names.map((n, i) =>
+      '<li class="' + (i < progress ? "done" : i === progress && !closed ? "next" : "") + '">' + esc(n) + "</li>"
+    ).join("");
+
+    let acts = "";
+    if (!closed && !finished) {
+      acts += '<input class="code-in" data-id="' + id + '" placeholder="code for waypoint ' + (progress + 1) + '" />' +
+              '<button class="textbtn" data-checkin="' + id + '">Check in</button>';
+    }
+    if (!closed) acts += '<button class="textbtn quiet" data-top="' + id + '">Add to the purse</button>';
+    if (closed && finished && !claimed) acts += '<button class="textbtn" data-claim="' + id + '">Claim your share</button>';
+    if (closed && mine && Number(t.finishers) === 0 && !t.reclaimed) acts += '<button class="textbtn quiet" data-reclaim="' + id + '">Reclaim the purse</button>';
+
+    return '<article class="trail">' +
+      "<h2>" + esc(t.name) + "</h2>" +
+      '<div class="byline">laid by ' + short(t.creator) + " · " + openFor(Number(t.closesAt)) + "</div>" +
+      '<div class="path">' + pathSvg(total, Math.min(progress, total)) + "</div>" +
+      '<ul class="stations">' + stations + "</ul>" +
+      '<p class="sentence">A purse of <b>' + fmt(t.purse) + " BOT</b> waits at the end. <b>" + t.finishers +
+        "</b> " + (Number(t.finishers) === 1 ? "walker has" : "walkers have") + " finished, which puts a share at <b>" +
+        fmt(share) + " BOT</b> each. You are <b>" + progress + " of " + total + "</b> waypoints in.</p>" +
+      (acts ? '<div class="codeline">' + acts + "</div>" : "") +
+    "</article>";
+  }).join("");
+}
+
+/* --------------------------------------------------------------- actions */
+async function send(label, fn) {
+  if (!contract) { toast("Connect a wallet first.", true); return; }
+  try {
+    toast(label + "…");
+    const tx = await fn();
+    await tx.wait();
+    toast(label + " confirmed");
+    await load();
+  } catch (e) { toast(reason(e), true); }
+}
+
+$("btn-create").onclick = async () => {
+  if (!contract) { toast("Connect a wallet first.", true); return; }
+  const name = $("f-name").value.trim();
+  const rows = [...$("wps").children];
+  const wpNames = rows.map((r) => r.querySelector(".wp-name").value.trim());
+  const codes = rows.map((r) => r.querySelector(".wp-code").value.trim());
+  const purse = $("f-purse").value;
+
+  if (!name) { toast("Name the trail.", true); return; }
+  if (!rows.length) { toast("Add at least one waypoint.", true); return; }
+  if (wpNames.some((n) => !n) || codes.some((c) => !c)) { toast("Every waypoint needs a name and a code.", true); return; }
+  if (!(Number(purse) >= 0.01)) { toast("The purse must be at least 0.01 BOT.", true); return; }
+
+  try {
+    const predicted = await contract.trailCount();
+    const gates = codes.map((code, i) =>
+      ethers.solidityPackedKeccak256(["uint256", "uint32", "string"], [predicted, i, code])
+    );
+    await send("Publishing the trail", () =>
+      contract.createTrail(name, wpNames, gates, $("f-dur").value, { value: ethers.parseEther(purse) })
+    );
+    const check = ethers.solidityPackedKeccak256(["uint256", "uint32", "string"], [predicted, 0, codes[0]]);
+    const stored = await contract.gateAt(predicted, 0);
+    if (stored.toLowerCase() !== check.toLowerCase()) {
+      toast("Published, but the trail number shifted — do NOT print these codes. Publish again.", true);
+    } else {
+      toast("Trail " + predicted + " published. Codes verified — safe to print.");
+    }
+  } catch (e) { toast(reason(e), true); }
+};
+
+$("trails").addEventListener("click", (ev) => {
+  const ci = ev.target.closest("button[data-checkin]");
+  if (ci) {
+    const id = ci.dataset.checkin;
+    const input = document.querySelector('.code-in[data-id="' + id + '"]');
+    const code = input && input.value.trim();
+    if (!code) { toast("Enter the code posted at the waypoint.", true); return; }
+    return send("Checking in", () => contract.checkIn(id, code));
+  }
+  const cl = ev.target.closest("button[data-claim]");
+  if (cl) return send("Claiming your share", () => contract.claimPurse(cl.dataset.claim));
+  const rc = ev.target.closest("button[data-reclaim]");
+  if (rc) return send("Reclaiming the purse", () => contract.reclaimPurse(rc.dataset.reclaim));
+  const tu = ev.target.closest("button[data-top]");
+  if (tu) {
+    const amt = prompt("Add how much BOT to the purse?", "0.5");
+    if (!amt || !(Number(amt) > 0)) return;
+    return send("Adding to the purse", () => contract.topUpPurse(tu.dataset.top, { value: ethers.parseEther(amt) }));
+  }
+});
+
+$("btn-connect").onclick = connect;
+$("btn-refresh").onclick = load;
+
+/* ------------------------------------------------------------------ boot */
+$("f-left").textContent = "TrailProof · " + NETWORK.chainName + " · " + NETWORK.label;
+$("f-chain").textContent = CONTRACT_ADDRESS !== ZERO ? short(CONTRACT_ADDRESS) : "contract not set";
+if (window.ethereum) {
+  window.ethereum.on("accountsChanged", () => location.reload());
+  window.ethereum.on("chainChanged", () => location.reload());
+}
+readOnly();
+load();
+
+/* ---- BOT Chain ecosystem footer: follows the NETWORK config above ---- */
+(function () {
+  var ex = document.getElementById("bc-explorer");
+  if (ex) ex.href = NETWORK.blockExplorerUrls[0];
+})();
+</script>
+</body>
+</html>
